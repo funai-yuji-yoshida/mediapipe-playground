@@ -19,7 +19,7 @@ Google MediaPipe でできることを、ブラウザだけで体験・調査で
 - 映像・音声・文章はブラウザ内で処理され、外部には送信されません（初回のみAIモデルをダウンロード）
 
 ## 動かし方
-- 公開版：GitHub Pages のURLを Chrome / Edge で開く（カメラ・マイクは https で動作）
+- 公開版：https://funai-yuji-yoshida.github.io/mediapipe-playground/ を Chrome / Edge で開く
 - 手元で確認：このフォルダで `python -m http.server 8765` を実行し、http://localhost:8765 を開く
 
 ## 回線が不安な会場で使う場合
