@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediaPipe お試しラボ</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --ink:#1d2330; --sub:#5d6677; --line:#dfe3ea;
+  --accent:#1a73e8; --accent-soft:#e8f0fe; --ok:#188038; --warn:#b06000; --err:#c5221f;
+  --stage:#11151c;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#14171d; --panel:#1c2028; --ink:#e7eaf0; --sub:#9aa3b2; --line:#2c323d;
+    --accent:#8ab4f8; --accent-soft:#1f2b3f; --ok:#81c995; --warn:#fdd663; --err:#f28b82; --stage:#0b0d11; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;font-size:14px;line-height:1.6}
+button,select,input,textarea{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.02em}
+header .tag{font-size:12px;color:var(--sub)}
+.modes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.modes button{border:0;background:transparent;padding:6px 16px;cursor:pointer}
+.modes button.on{background:var(--accent);color:#fff}
+@media (prefers-color-scheme: dark){ .modes button.on{color:#111} }
+
+.app{display:grid;grid-template-columns:220px 1fr 340px;height:calc(100% - 53px)}
+nav{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:8px 0}
+nav h2{font-size:12px;color:var(--sub);margin:12px 16px 4px;font-weight:600}
+nav button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:7px 16px;cursor:pointer;border-left:3px solid transparent}
+nav button:hover{background:var(--accent-soft)}
+nav button.on{background:var(--accent-soft);border-left-color:var(--accent);font-weight:700}
+#navSelect{display:none}
+
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.inputs{display:flex;gap:6px;padding:8px 12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel)}
+.inputs button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 12px;cursor:pointer}
+.inputs button.on{border-color:var(--accent);background:var(--accent-soft);font-weight:700}
+.inputs button:disabled{opacity:.35;cursor:not-allowed}
+.inputs .hint{color:var(--sub);font-size:12px;margin-left:auto}
+.stage{position:relative;flex:1;min-height:0;background:var(--stage);display:flex;align-items:center;justify-content:center;overflow:hidden}
+#view{max-width:100%;max-height:100%;display:block}
+#view.mirror{transform:scaleX(-1)}
+#view.clickable{cursor:crosshair}
+.summary{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#fff;padding:8px 18px;border-radius:999px;font-size:18px;font-weight:700;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}
+.summary:empty{display:none}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(10,12,16,.82);color:#fff;text-align:center;padding:24px}
+.overlay[hidden]{display:none}
+.overlay p{max-width:520px;margin:0}
+.overlay button{border:0;background:#8ab4f8;color:#111;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:700}
+.spinner{width:36px;height:36px;border-radius:50%;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.textbox{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:10px;background:var(--stage)}
+.textbox[hidden]{display:none}
+.textbox textarea{width:min(640px,100%);height:180px;border-radius:12px;border:1px solid #333;background:#1b1f27;color:#fff;padding:14px;font-size:18px;resize:vertical}
+.textbox .samples{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.textbox .samples button{border:1px solid #444;background:#222833;color:#ddd;border-radius:999px;padding:3px 12px;cursor:pointer;font-size:13px}
+
+aside{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:16px}
+aside h3{margin:0 0 4px;font-size:18px}
+aside .group{font-size:12px;color:var(--sub)}
+aside section{margin-top:16px}
+aside h4{font-size:12px;color:var(--sub);margin:0 0 6px;font-weight:600}
+.usecase{background:var(--accent-soft);border-radius:10px;padding:10px 12px}
+.usecase b{color:var(--accent)}
+.privacy{font-size:12px;color:var(--sub);border-top:1px solid var(--line);padding-top:10px}
+.bars{display:flex;flex-direction:column;gap:5px}
+.bar{display:grid;grid-template-columns:1fr 52px;gap:6px;align-items:center;font-size:13px}
+.bar .track{grid-column:1/3;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar .fill{height:100%;background:var(--accent)}
+.bar .v{text-align:right;color:var(--sub);font-variant-numeric:tabular-nums}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.metric{border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.metric .k{font-size:11px;color:var(--sub)}
+.metric .n{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.ctrl{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin-bottom:8px;font-size:13px}
+.ctrl input[type=range]{grid-column:1/3;width:100%}
+.ctrl select{grid-column:1/3;padding:4px;border-radius:6px;border:1px solid var(--line);background:var(--panel)}
+.note{font-size:12px;color:var(--warn)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:11px;max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin:0}
+.lab-only{display:none}
+body.lab .lab-only{display:block}
+body.lab .demo-only{display:none}
+body.lab .summary{font-size:14px}
+
+@media (max-width: 1100px){ .app{grid-template-columns:190px 1fr 290px} }
+@media (max-width: 767px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto 56vh auto;height:auto}
+  nav{border-right:0;border-bottom:1px solid var(--line);padding:8px 16px}
+  nav .list{display:none}
+  #navSelect{display:block;width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
+  aside{border-left:0;border-top:1px solid var(--line)}
+  header{padding:10px 16px;flex-wrap:wrap}
+  header .tag{display:none}
+  .summary{font-size:15px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>MediaPipe お試しラボ</h1>
+  <span class="tag">Google MediaPipe でできることを、その場で体験</span>
+  <div class="modes" role="group" aria-label="表示の切り替え">
+    <button id="modeDemo" class="on" type="button">デモ表示</button>
+    <button id="modeLab" type="button">調査表示</button>
+  </div>
+</header>
+<div class="app">
+  <nav>
+    <select id="navSelect" aria-label="機能を選ぶ"></select>
+    <div class="list" id="navList"></div>
+  </nav>
+  <main>
+    <div class="inputs" id="inputs">
+      <button type="button" data-input="camera">カメラ</button>
+      <button type="button" data-input="image">画像ファイル</button>
+      <button type="button" data-input="video">動画ファイル</button>
+      <button type="button" data-input="mic">マイク</button>
+      <button type="button" data-input="text">文章入力</button>
+      <span class="hint" id="inputHint"></span>
+      <input type="file" id="fileImage" accept="image/*" hidden>
+      <input type="file" id="fileVideo" accept="video/*" hidden>
+    </div>
+    <div class="stage" id="stage">
+      <canvas id="view" width="1280" height="720"></canvas>
+      <div class="summary" id="summary"></div>
+      <div class="textbox" id="textbox" hidden>
+        <textarea id="textIn" placeholder="ここに文章を入力してください（何語でも可）"></textarea>
+        <div class="samples" id="samples"></div>
+      </div>
+      <div class="overlay" id="overlay" hidden></div>
+    </div>
+  </main>
+  <aside>
+    <div class="group" id="fGroup"></div>
+    <h3 id="fName"></h3>
+    <p id="fDesc" style="margin:4px 0 0"></p>
+    <section class="demo-only"><div class="usecase"><b>業務でこう使える：</b><span id="fUse"></span></div></section>
+    <section><h4>結果</h4><div class="bars" id="bars"></div></section>
+    <section class="lab-only">
+      <h4>計測</h4>
+      <div class="metrics">
+        <div class="metric"><div class="k">FPS</div><div class="n" id="mFps">–</div></div>
+        <div class="metric"><div class="k">推論 ms</div><div class="n" id="mMs">–</div></div>
+        <div class="metric"><div class="k">読込 秒</div><div class="n" id="mLoad">–</div></div>
+      </div>
+      <div class="note" id="mNote"></div>
+    </section>
+    <section class="lab-only"><h4>設定</h4><div id="ctrls"></div></section>
+    <section class="lab-only"><h4>結果の生データ（JSON）</h4><pre id="json"></pre></section>
+    <section class="privacy">映像・音声・文章はこの端末のブラウザの中だけで処理され、外部には送信されません（初回にAIモデルをダウンロードします）。</section>
+  </aside>
+</div>
+<video id="srcVideo" playsinline muted hidden></video>
+
+<script type="module">
+/* ===== 読み込み先（モデルを同じ場所に置く場合は MODEL_BASE を './models/' に変更） ===== */
+const VER = '1.2.2';
+const CDN = 'https:\/\/cdn.jsdelivr.net/npm/@mediapipe/';
+const MODEL_BASE = 'https:\/\/storage.googleapis.com/mediapipe-models/';
+
+let V = null, A = null, T = null; /* 各パッケージは必要になった時に読み込む（読み込み後は { ...モジュール, fs } の形） */
+async function loadPkg(name, resolver){
+  const m = await import(CDN+'tasks-'+name+'@'+VER+'/'+name+'_bundle.mjs');
+  return { ...m, fs: await m.FilesetResolver[resolver](CDN+'tasks-'+name+'@'+VER+'/wasm') };
+}
+const pkg = {
+  async vision(){ return V ||= await loadPkg('vision', 'forVisionTasks'); },
+  async audio(){ return A ||= await loadPkg('audio', 'forAudioTasks'); },
+  async text(){ return T ||= await loadPkg('text', 'forTextTasks'); },
+};
+
+/* ===== 日本語の対応表 ===== */
+const JA_GESTURE = {None:'なし',Closed_Fist:'グー',Open_Palm:'パー',Pointing_Up:'人差し指を立てる',Thumb_Down:'親指を下に',Thumb_Up:'いいね（親指を上に）',Victory:'ピース',ILoveYou:'アイラブユー'};
+const JA_COCO = {person:'人',bicycle:'自転車',car:'車',motorcycle:'バイク',airplane:'飛行機',bus:'バス',train:'電車',truck:'トラック',boat:'船','traffic light':'信号機','fire hydrant':'消火栓','stop sign':'一時停止標識','parking meter':'パーキングメーター',bench:'ベンチ',bird:'鳥',cat:'猫',dog:'犬',horse:'馬',sheep:'羊',cow:'牛',elephant:'象',bear:'熊',zebra:'シマウマ',giraffe:'キリン',backpack:'リュック',umbrella:'傘',handbag:'ハンドバッグ',tie:'ネクタイ',suitcase:'スーツケース',frisbee:'フリスビー',skis:'スキー板',snowboard:'スノーボード','sports ball':'ボール',kite:'凧','baseball bat':'バット','baseball glove':'グローブ',skateboard:'スケートボード',surfboard:'サーフボード','tennis racket':'テニスラケット',bottle:'ボトル','wine glass':'ワイングラス',cup:'カップ',fork:'フォーク',knife:'ナイフ',spoon:'スプーン',bowl:'ボウル',banana:'バナナ',apple:'りんご',sandwich:'サンドイッチ',orange:'オレンジ',broccoli:'ブロッコリー',carrot:'にんじん','hot dog':'ホットドッグ',pizza:'ピザ',donut:'ドーナツ',cake:'ケーキ',chair:'椅子',couch:'ソファ','potted plant':'鉢植え',bed:'ベッド','dining table':'テーブル',toilet:'トイレ',tv:'テレビ',laptop:'ノートPC',mouse:'マウス',remote:'リモコン',keyboard:'キーボード','cell phone':'スマートフォン',microwave:'電子レンジ',oven:'オーブン',toaster:'トースター',sink:'シンク',refrigerator:'冷蔵庫',book:'本',clock:'時計',vase:'花瓶',scissors:'はさみ','teddy bear':'ぬいぐるみ','hair drier':'ドライヤー',toothbrush:'歯ブラシ'};
+const JA_BLEND = {_neutral:'無表情',browDownLeft:'眉をひそめる（左）',browDownRight:'眉をひそめる（右）',browInnerUp:'眉の内側を上げる',browOuterUpLeft:'眉を上げる（左）',browOuterUpRight:'眉を上げる（右）',cheekPuff:'頬をふくらませる',cheekSquintLeft:'頬を上げる（左）',cheekSquintRight:'頬を上げる（右）',eyeBlinkLeft:'まばたき（左）',eyeBlinkRight:'まばたき（右）',eyeLookDownLeft:'下を見る（左目）',eyeLookDownRight:'下を見る（右目）',eyeLookInLeft:'内側を見る（左目）',eyeLookInRight:'内側を見る（右目）',eyeLookOutLeft:'外側を見る（左目）',eyeLookOutRight:'外側を見る（右目）',eyeLookUpLeft:'上を見る（左目）',eyeLookUpRight:'上を見る（右目）',eyeSquintLeft:'目を細める（左）',eyeSquintRight:'目を細める（右）',eyeWideLeft:'目を見開く（左）',eyeWideRight:'目を見開く（右）',jawForward:'あごを前に',jawLeft:'あごを左に',jawOpen:'口を開ける',jawRight:'あごを右に',mouthClose:'口を閉じる',mouthDimpleLeft:'えくぼ（左）',mouthDimpleRight:'えくぼ（右）',mouthFrownLeft:'への字口（左）',mouthFrownRight:'への字口（右）',mouthFunnel:'口をとがらせる',mouthLeft:'口を左に',mouthLowerDownLeft:'下唇を下げる（左）',mouthLowerDownRight:'下唇を下げる（右）',mouthPressLeft:'唇を押しつける（左）',mouthPressRight:'唇を押しつける（右）',mouthPucker:'口をすぼめる',mouthRight:'口を右に',mouthRollLower:'下唇を巻き込む',mouthRollUpper:'上唇を巻き込む',mouthShrugLower:'下唇を突き出す',mouthShrugUpper:'上唇を上げる',mouthSmileLeft:'笑顔（左）',mouthSmileRight:'笑顔（右）',mouthStretchLeft:'口を横に引く（左）',mouthStretchRight:'口を横に引く（右）',mouthUpperUpLeft:'上唇を上げる（左）',mouthUpperUpRight:'上唇を上げる（右）',noseSneerLeft:'鼻にしわ（左）',noseSneerRight:'鼻にしわ（右）'};
+const JA_SOUND = {Speech:'話し声',Music:'音楽',Silence:'無音',Clapping:'拍手',Applause:'拍手喝采','Finger snapping':'指パッチン',Typing:'タイピング','Computer keyboard':'キーボード入力',Whistling:'口笛',Laughter:'笑い声',Cough:'せき',Sneeze:'くしゃみ',Breathing:'呼吸音',Singing:'歌声',Dog:'犬',Bark:'犬の鳴き声',Cat:'猫',Meow:'猫の鳴き声',Alarm:'アラーム','Smoke detector, smoke alarm':'火災報知器',Telephone:'電話','Telephone bell ringing':'電話の呼び出し音',Ringtone:'着信音',Bell:'ベル',Knock:'ノック',Door:'ドア',Vehicle:'乗り物',Car:'車',Engine:'エンジン',Siren:'サイレン',Water:'水','Water tap, faucet':'蛇口の水',Wind:'風',Rain:'雨',Tools:'工具',Hammer:'ハンマー',Drill:'ドリル',Sawing:'のこぎり','Mechanical fan':'扇風機','Air conditioning':'エアコン',Beep:'ビープ音',Inside:'屋内の環境音','Inside, small room':'小部屋の環境音','Inside, large room or hall':'広い部屋の環境音',Outside:'屋外の環境音',Noise:'雑音','White noise':'ホワイトノイズ',Static:'ノイズ',Hum:'うなり音',Click:'クリック音',Tap:'叩く音','Male speech, man speaking':'男性の声','Female speech, woman speaking':'女性の声','Child speech, kid speaking':'子どもの声',Conversation:'会話',Narration:'ナレーション',Shout:'叫び声',Whispering:'ささやき',Humming:'鼻歌',Chewing:'咀嚼音',Footsteps:'足音',Writing:'書く音'};
+const JA_LANG = {ja:'日本語',en:'英語',zh:'中国語',ko:'韓国語',fr:'フランス語',de:'ドイツ語',es:'スペイン語',pt:'ポルトガル語',it:'イタリア語',ru:'ロシア語',ar:'アラビア語',hi:'ヒンディー語',th:'タイ語',vi:'ベトナム語',id:'インドネシア語',ms:'マレー語',tl:'タガログ語',nl:'オランダ語',tr:'トルコ語',pl:'ポーランド語',sv:'スウェーデン語',uk:'ウクライナ語',ne:'ネパール語',my:'ミャンマー語',km:'クメール語',mn:'モンゴル語'};
+const ja = (map, s) => map[s] || s;
+
+/* ===== 状態 ===== */
+const $ = id => document.getElementById(id);
+const view = $('view'), ctx = view.getContext('2d'), vid = $('srcVideo');
+const S = {
+  feature:null, task:null, input:null, gen:0, raf:0, stream:null, micStream:null, audioCtx:null, audioNode:null,
+  img:null, lastVideoTime:-1, mirror:false, delegate:'GPU', modelIdx:{}, opts:{}, timings:[], frames:[], lastResult:null, clickPoint:null,
+};
+
+/* ===== 描画の補助 ===== */
+const COLORS = ['#4285f4','#ea4335','#fbbc04','#34a853','#a142f4','#24c1e0'];
+function label(text, x, y, color){
+  /* ミラー表示でも文字が読めるように、文字だけ反転を打ち消して描く */
+  ctx.save();
+  ctx.font = `bold ${Math.max(14, view.width/60)}px sans-serif`;
+  const w = ctx.measureText(text).width + 10, h = Math.max(20, view.width/48);
+  ctx.translate(x, Math.max(y, h)); /* 上端からはみ出す時は枠の内側に描く */
+  if (S.mirror) ctx.scale(-1, 1);
+  ctx.fillStyle = color; ctx.fillRect(S.mirror ? -w : 0, -h, w, h);
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'bottom';
+  ctx.fillText(text, (S.mirror ? -w : 0) + 5, -3);
+  ctx.restore();
+}
+function box(b, color, text){
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, view.width/400);
+  ctx.strokeRect(b.originX, b.originY, b.width, b.height);
+  if (text) label(text, S.mirror ? b.originX + b.width : b.originX, b.originY, color);
+}
+const lw = () => Math.max(1.5, view.width/500);
+const pct = v => (v*100).toFixed(1) + '%';
+
+/* ===== 機能の定義 ===== */
+const vis = (cls, extra={}) => async (fs, model, delegate, opts, mode) => {
+  const v = await pkg.vision();
+  return v[cls].createFromOptions(v.fs, { baseOptions:{ modelAssetPath: model, delegate }, runningMode: mode, ...extra, ...opts });
+};
+const landmarkDraw = (getSets, connections, color) => (r) => {
+  const du = new V.DrawingUtils(ctx);
+  for (const lm of getSets(r)) {
+    du.drawConnectors(lm, connections(), { color, lineWidth: lw() });
+    du.drawLandmarks(lm, { color:'#fff', fillColor: color, lineWidth: 1, radius: lw()*1.3 });
+  }
+};
+
+const FEATURES = [
+  { id:'face', group:'顔', name:'顔検出', inputs:['camera','image','video'],
+    desc:'映像の中の顔の位置を四角で囲み、目・鼻・口など6点の位置も出します。軽量で高速です。',
+    use:'店舗の来店者数カウント、受付での人の接近検知、写真の顔ぼかし。',
+    models:[{label:'近距離用（標準）', path:'face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'}],
+    options:[{key:'minDetectionConfidence', label:'検出のしきい値', min:0.1, max:0.95, step:0.05, value:0.5}],
+    create: vis('FaceDetector'),
+    run:(t,src,ts,m)=> m==='IMAGE' ? t.detect(src) : t.detectForVideo(src,ts),
+    draw(r){ r.detections.forEach((d,i)=>{ const c=COLORS[i%6]; box(d.boundingBox,c,'顔 '+pct(d.categories[0].score));
+      ctx.fillStyle=c; d.keypoints.forEach(k=>{ ctx.beginPath(); ctx.arc(k.x*view.width,k.y*view.height,lw()*2,0,7); ctx.fill(); }); }); },
+    summary:r=> r.detections.length ? `顔を ${r.detections.length} 人検出` : '顔が見つかりません',
+    bars:r=> r.detections.map((d,i)=>[`顔 ${i+1}`, d.categories[0].score]),
+  },
+  { id:'faceMesh', group:'顔', name:'顔の細かい点と表情', inputs:['camera','image','video'],
+    desc:'顔の478点を立体的に捉え、まばたき・笑顔・口の開きなど52種類の表情の強さを数値で出します。',
+    use:'表情から満足度や眠気を推定、アバターの表情連動、運転・作業中の居眠り検知。',
+    models:[{label:'標準', path:'face_landmarker/face_landmarker/float16/1/face_landmarker.task'}],
+    options:[{key:'numFaces', label:'顔の最大数', min:1, max:4, step:1, value:1},
+             {key:'minFaceDetectionConfidence', label:'検出のしきい値', min:0.1, max:0.95, step:0.05, value:0.5}],
+    create: vis('FaceLandmarker', { outputFaceBlendshapes:true }),
+    run:(t,src,ts,m)=> m==='IMAGE' ? t.detect(src) : t.detectForVideo(src,ts),
+    draw(r){ const du=new V.DrawingUtils(ctx);
+      for (const lm of r.faceLandmarks){
+        du.drawConnectors(lm, V.FaceLandmarker.FACE_LANDMARKS_TESSELATION, {color:'rgba(200,220,255,.35)', lineWidth:1});
+        du.drawConnectors(lm, V.FaceLandmarker.FACE_LANDMARKS_CONTOURS, {color:'#4285f4', lineWidth:lw()});
+      } },
+    summary:r=>{ if(!r.faceLandmarks.length) return '顔が見つかりません';
+      const top = topBlend(r); return top ? `いちばん強い表情：${ja(JA_BLEND,top.categoryName)}（${pct(top.score)}）` : '顔を検出'; },
+    bars:r=> (r.faceBlendshapes?.[0]?.categories||[]).filter(c=>c.categoryName!=='_neutral').sort((a,b)=>b.score-a.score).slice(0,6).map(c=>[ja(JA_BLEND,c.categoryName), c.score]),
+  },
+  { id:'hand', group:'手', name:'手のランドマーク', inputs:['camera','image','video'],
+    desc:'手の指先・関節など21点の位置を追跡し、左右どちらの手かも判定します。',
+    use:'画面に触れない操作（衛生面が重要な現場）、手作業の動きの記録・分析。',
+    models:[{label:'標準', path:'hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'}],
+    options:[{key:'numHands', label:'手の最大数', min:1, max:4, step:1, value:2},
+             {key:'minHandDetectionConfidence', label:'検出のしきい値', min:0.1, max:0.95, step:0.05, value:0.5}],
+    create: vis('HandLandmarker'),
+    run:(t,src,ts,m)=> m==='IMAGE' ? t.detect(src) : t.detectForVideo(src,ts),
+    draw:landmarkDraw(r=>r.landmarks, ()=>V.HandLandmarker.HAND_CONNECTIONS, '#34a853'),
+    summary:r=> r.landmarks.length ? `手を ${r.landmarks.length} つ検出` : '手が見つかりません',
+    bars:r=> r.handedness.map((h,i)=>[`手 ${i+1}：${h[0].categoryName==='Left'?'左手':'右手'}`, h[0].score]),
+  },
+  { id:'gesture', group:'手', name:'ジェスチャー認識', inputs:['camera','image','video'],
+    desc:'手の形から、グー・パー・ピース・いいね など7種類のジェスチャーを見分けます。',
+    use:'手袋をしたままの合図入力、離れた場所からのスライド送り、非接触の受付操作。',
+    models:[{label:'標準', path:'gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task'}],
+    options:[{key:'numHands', label:'手の最大数', min:1, max:4, step:1, value:2},
+             {key:'minHandDetectionConfidence', label:'検出のしきい値', min:0.1, max:0.95, step:0.05, value:0.5}],
+    create: vis('GestureRecognizer'),
+    run:(t,src,ts,m)=> m==='IMAGE' ? t.recognize(src) : t.recognizeForVideo(src,ts),
+    draw(r){ landmarkDraw(r=>r.landmarks, ()=>V.GestureRecognizer.HAND_CONNECTIONS, '#fbbc04')(r);
+      r.landmarks.forEach((lm,i)=>{ const g=r.gestures[i]?.[0]; if(!g) return; const xs=lm.map(p=>p.x), ys=lm.map(p=>p.y);
+        const x=(S.mirror?Math.max(...xs):Math.min(...xs))*view.width, y=Math.min(...ys)*view.height-6; label(ja(JA_GESTURE,g.categoryName), x, y, '#b06000'); }); },
+    summary:r=>{ const g=r.gestures.map(x=>ja(JA_GESTURE,x[0].categoryName)).filter(n=>n!=='なし'); return r.landmarks.length ? (g.length? 'ジェスチャー：'+g.join('・') : '手は見えています（ジェスチャーなし）') : '手をカメラに向けてください'; },
+    bars:r=> r.gestures.map((g,i)=>[`手 ${i+1}：${ja(JA_GESTURE,g[0].categoryName)}`, g[0].score]),
+  },
+  { id:'pose', group:'体', name:'姿勢推定', inputs:['camera','image','video'],
+    desc:'全身の33点（肩・肘・腰・膝など）を捉え、体の姿勢を骨格として表示します。',
+    use:'作業姿勢・腰への負担チェック、フォームの指導、転倒検知、リハビリの記録。',
+    models:[{label:'軽量（標準）', path:'pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task'},
+            {label:'中（精度と速度のバランス）', path:'pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task'},
+            {label:'高精度（重い・約31MB）', path:'pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task'}],
+    options:[{key:'numPoses', label:'人数の上限', min:1, max:4, step:1, value:1},
+             {key:'minPoseDetectionConfidence', label:'検出のしきい値', min:0.1, max:0.95, step:0.05, value:0.5}],
+    create: vis('PoseLandmarker'),
+    run:(t,src,ts,m)=> m==='IMAGE' ? t.detect(src) : t.detectForVideo(src,ts),
+    draw:landmarkDraw(r=>r.landmarks, ()=>V.PoseLandmarker.POSE_CONNECTIONS, '#a142f4'),
+    summary:r=>{ if(!r.landmarks.length) return '人が見つかりません'; const a=bendAngle(r.landmarks[0]); return `${r.landmarks.length} 人の姿勢を検出` + (a!=null?`／上体の傾き 約${a}°`:''); },
+    bars:r=>{ const lm=r.landmarks[0]; if(!lm) return []; const vis=i=>lm[i].visibility??0;
+      return [['左肩の見え方',vis(11)],['右肩の見え方',vis(12)],['左ひざの見え方',vis(25)],['右ひざの見え方',vis(26)]]; },
+  },
+  { id:'object', group:'物', name:'物体検出', inputs:['camera','image','video'],
+    desc:'人・車・ボトル・椅子・ノートPCなど80種類の物を見つけ、位置を四角で囲みます。',
+    use:'在庫や来場者・車両の数え上げ、置き忘れ検知、立入禁止エリアへの侵入検知。',
+    models:[{label:'軽量（標準）', path:'object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite'},
+            {label:'高精度（重い）', path:'object_detector/efficientdet_lite2/float16/1/efficientdet_lite2.tflite'}],
+    options:[{key:'scoreThreshold', label:'検出のしきい値', min:0.1, max:0.95, step:0.05, value:0.4},
+             {key:'maxResults', label:'最大検出数', min:1, max:20, step:1, value:8}],
+    create: vis('ObjectDetector'),
+    run:(t,src,ts,m)=> m==='IMAGE' ? t.detect(src) : t.detectForVideo(src,ts),
+    draw(r){ r.detections.forEach((d,i)=>{ const c=d.categories[0]; box(d.boundingBox, COLORS[i%6], `${ja(JA_COCO,c.categoryName)} ${pct(c.score)}`); }); },
+    summary:r=>{ if(!r.detections.length) return '物が見つかりません'; const cnt={}; r.detections.forEach(d=>{const n=ja(JA_COCO,d.categories[0].categoryName); cnt[n]=(cnt[n]||0)+1;});
+      return Object.entries(cnt).map(([k,v])=>`${k}×${v}`).join('、'); },
+    bars:r=> r.detections.map(d=>[ja(JA_COCO,d.categories[0].categoryName), d.categories[0].score]),
+  },
+  { id:'classify', group:'物', name:'画像分類', inputs:['camera','image','video'],
+    desc:'画像全体に何が写っているかを、1000種類の分類から当てます（分類名は英語です）。',
+    use:'写真の自動仕分け・タグ付け、商品画像のカテゴリ判定の下準備。',
+    models:[{label:'軽量（標準）', path:'image_classifier/efficientnet_lite0/float32/1/efficientnet_lite0.tflite'},
+            {label:'高精度（重い）', path:'image_classifier/efficientnet_lite2/float32/1/efficientnet_lite2.tflite'}],
+    options:[{key:'maxResults', label:'表示する候補数', min:1, max:10, step:1, value:5}],
+    create: vis('ImageClassifier'),
+    run:(t,src,ts,m)=> m==='IMAGE' ? t.classify(src) : t.classifyForVideo(src,ts),
+    draw(){},
+    summary:r=>{ const c=r.classifications[0]?.categories[0]; return c ? `いちばん近い分類：${c.categoryName}（${pct(c.score)}）` : '判定できませんでした'; },
+    bars:r=> (r.classifications[0]?.categories||[]).map(c=>[c.categoryName, c.score]),
+  },
+  { id:'selfie', group:'切り抜き', name:'人物の背景切り抜き', inputs:['camera','image','video'], drawsFrame:true,
+    desc:'人物の部分だけを切り出し、背景をぼかしたり別の色に差し替えたりします。',
+    use:'オンライン会議の背景差し替え、証明写真・プロフィール写真の背景処理。',
+    models:[{label:'標準', path:'image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite'}],
+    options:[{key:'bg', label:'背景', local:true, choices:[['blur','ぼかす'],['green','グリーン'],['white','白'],['mask','切り抜き部分を色で表示']], value:'blur'}],
+    create: vis('ImageSegmenter', { outputConfidenceMasks:true, outputCategoryMask:false }),
+    run(t,src,ts,m){ const r = m==='IMAGE' ? t.segment(src) : t.segmentForVideo(src,ts);
+      const mk=r.confidenceMasks[0]; const out={ width:mk.width, height:mk.height, mask:mk.getAsFloat32Array().slice() }; r.close(); return out; },
+    draw(r, src){ drawSelfie(r, src); },
+    summary:r=>{ const a=coverage(r.mask, .5); return a>0.01 ? `人物の領域：画面の ${pct(a)}` : '人物が見つかりません'; },
+    bars:r=> [['人物の領域の割合', coverage(r.mask,.5)]],
+    json:r=> ({ width:r.width, height:r.height, 人物領域の割合:coverage(r.mask,.5) }),
+  },
+  { id:'magic', group:'切り抜き', name:'クリックした物の切り抜き', inputs:['image'], clickable:true,
+    desc:'画像の中の切り抜きたい物をクリックすると、その物の輪郭を自動で見つけて切り抜きます。',
+    use:'商品写真の切り抜き、資料用の画像加工の手間削減。',
+    models:[{label:'標準', path:'interactive_segmenter/magic_touch/float32/1/magic_touch.tflite'}],
+    options:[],
+    create: async (fs, model, delegate, opts) => { const v=await pkg.vision();
+      return v.InteractiveSegmenterLegacy.createFromOptions(v.fs, { baseOptions:{ modelAssetPath:model, delegate }, outputConfidenceMasks:true, outputCategoryMask:false }); },
+    imageOnly:true,
+    run(t,src){ if(!S.clickPoint) return null; const r=t.segment(src, { keypoint:S.clickPoint });
+      const mk=r.confidenceMasks[0]; const out={ width:mk.width, height:mk.height, mask:mk.getAsFloat32Array().slice(), point:S.clickPoint }; r.close(); return out; },
+    draw(r){ if(r) drawMaskOverlay(r, [26,115,232]); },
+    summary:r=> r ? `切り抜いた範囲：画像の ${pct(coverage(r.mask,.5))}` : '画像の中の物をクリックしてください',
+    bars:r=> r ? [['切り抜いた範囲の割合', coverage(r.mask,.5)]] : [],
+    json:r=> r ? { クリック位置:r.point, 範囲の割合:coverage(r.mask,.5) } : null,
+  },
+  { id:'audio', group:'音', name:'音の分類', inputs:['mic'], audio:true,
+    desc:'マイクの音を聞いて、話し声・拍手・音楽・アラームなど521種類のどれに近いかを判定します。',
+    use:'設備の異音・アラーム音の検知、店内のにぎわい計測、見守り（ガラスの割れる音など）。',
+    models:[{label:'標準（YAMNet）', path:'audio_classifier/yamnet/float32/1/yamnet.tflite'}],
+    options:[{key:'maxResults', label:'表示する候補数', min:1, max:10, step:1, value:5},
+             {key:'scoreThreshold', label:'表示のしきい値', min:0, max:0.5, step:0.01, value:0.05}],
+    create: async (fs, model, delegate, opts) => { const a=await pkg.audio();
+      return a.AudioClassifier.createFromOptions(a.fs, { baseOptions:{ modelAssetPath:model }, ...opts }); },
+    summary:r=>{ const c=r?.[0]; return c ? `聞こえている音：${ja(JA_SOUND,c.categoryName)}（${pct(c.score)}）` : '音を聞いています…'; },
+    bars:r=> (r||[]).map(c=>[ja(JA_SOUND,c.categoryName), c.score]),
+  },
+  { id:'lang', group:'文章', name:'言語判定', inputs:['text'], text:true,
+    desc:'入力した文章が何語かを判定します。110以上の言語に対応しています。',
+    use:'問い合わせメールの言語ごとの振り分け、多言語窓口での担当者割り当て。',
+    models:[{label:'標準', path:'language_detector/language_detector/float32/1/language_detector.tflite'}],
+    options:[{key:'maxResults', label:'表示する候補数', min:1, max:10, step:1, value:5}],
+    create: async (fs, model, delegate, opts) => { const t=await pkg.text();
+      return t.LanguageDetector.createFromOptions(t.fs, { baseOptions:{ modelAssetPath:model }, ...opts }); },
+    summary:r=>{ const l=r?.languages?.[0]; return l ? `判定：${ja(JA_LANG,l.languageCode)}（${pct(l.probability)}）` : '文章を入力してください'; },
+    bars:r=> (r?.languages||[]).map(l=>[`${ja(JA_LANG,l.languageCode)}（${l.languageCode}）`, l.probability]),
+  },
+];
+const byId = Object.fromEntries(FEATURES.map(f=>[f.id,f]));
+
+function topBlend(r){ return (r.faceBlendshapes?.[0]?.categories||[]).filter(c=>c.categoryName!=='_neutral').sort((a,b)=>b.score-a.score)[0]; }
+function bendAngle(lm){ /* 肩の中点と腰の中点を結ぶ線の、垂直からの傾き */
+  const ok=i=>(lm[i].visibility??1)>0.5; if(![11,12,23,24].every(ok)) return null;
+  const sx=(lm[11].x+lm[12].x)/2, sy=(lm[11].y+lm[12].y)/2, hx=(lm[23].x+lm[24].x)/2, hy=(lm[23].y+lm[24].y)/2;
+  return Math.round(Math.abs(Math.atan2((sx-hx)*view.width, (hy-sy)*view.height))*180/Math.PI); }
+function coverage(mask, th){ let n=0; for(let i=0;i<mask.length;i++) if(mask[i]>th) n++; return n/mask.length; }
+
+/* ===== 切り抜きの描画 ===== */
+const maskCv = document.createElement('canvas'), maskCtx = maskCv.getContext('2d');
+const personCv = document.createElement('canvas'), personCtx = personCv.getContext('2d');
+function maskToCanvas(r, rgb, alphaScale=1){
+  maskCv.width=r.width; maskCv.height=r.height;
+  const id = maskCtx.createImageData(r.width, r.height), d=id.data;
+  for (let i=0;i<r.mask.length;i++){ const a=r.mask[i]; d[i*4]=rgb[0]; d[i*4+1]=rgb[1]; d[i*4+2]=rgb[2]; d[i*4+3]=a*255*alphaScale; }
+  maskCtx.putImageData(id,0,0); return maskCv;
+}
+function drawSelfie(r, src){
+  const W=view.width, H=view.height, bg=S.opts.bg||'blur';
+  if (bg==='mask'){ ctx.drawImage(src,0,0,W,H); ctx.drawImage(maskToCanvas(r,[66,133,244],.55),0,0,W,H); return; }
+  if (bg==='blur'){ ctx.save(); ctx.filter=`blur(${Math.round(W/80)}px)`; ctx.drawImage(src,0,0,W,H); ctx.restore(); }
+  else { ctx.fillStyle = bg==='green' ? '#00b140' : '#ffffff'; ctx.fillRect(0,0,W,H); }
+  personCv.width=W; personCv.height=H;
+  personCtx.globalCompositeOperation='source-over'; personCtx.drawImage(src,0,0,W,H);
+  personCtx.globalCompositeOperation='destination-in'; personCtx.drawImage(maskToCanvas(r,[0,0,0]),0,0,W,H);
+  ctx.drawImage(personCv,0,0);
+}
+function drawMaskOverlay(r, rgb){ ctx.drawImage(maskToCanvas(r, rgb, .5), 0, 0, view.width, view.height);
+  if (r.point){ ctx.fillStyle='#ea4335'; ctx.beginPath(); ctx.arc(r.point.x*view.width, r.point.y*view.height, lw()*4, 0, 7); ctx.fill(); } }
+
+/* ===== 画面：機能一覧 ===== */
+function buildNav(){
+  const list=$('navList'), sel=$('navSelect'); let g='';
+  for (const f of FEATURES){
+    if (f.group!==g){ g=f.group; const h=document.createElement('h2'); h.textContent=g; list.appendChild(h);
+      const og=document.createElement('optgroup'); og.label=g; sel.appendChild(og); }
+    const b=document.createElement('button'); b.type='button'; b.textContent=f.name; b.dataset.id=f.id; b.onclick=()=>selectFeature(f.id); list.appendChild(b);
+    const o=document.createElement('option'); o.value=f.id; o.textContent=f.name; sel.lastChild.appendChild(o);
+  }
+  sel.onchange=()=>selectFeature(sel.value);
+}
+
+/* ===== 状態表示 ===== */
+function showLoading(msg){ const o=$('overlay'); o.innerHTML=`<div class="spinner"></div><p>${msg}</p>`; o.hidden=false; }
+function showError(msg, retry, extraBtn){ const o=$('overlay'); o.innerHTML=`<p>${msg}</p>`; o.hidden=false;
+  if (retry){ const b=document.createElement('button'); b.textContent='もう一度試す'; b.onclick=retry; o.appendChild(b); }
+  if (extraBtn){ const b=document.createElement('button'); b.textContent=extraBtn[0]; b.onclick=extraBtn[1]; o.appendChild(b); } }
+function showPrompt(msg, btnText, fn){ showError(msg, null, [btnText, fn]); }
+function hideOverlay(){ $('overlay').hidden=true; }
+function setSummary(t){ $('summary').textContent=t||''; }
+
+function renderBars(rows){
+  const el=$('bars'); el.innerHTML='';
+  if (!rows || !rows.length){ el.innerHTML='<div style="color:var(--sub);font-size:13px">まだ結果はありません</div>'; return; }
+  for (const [name,v] of rows){ const d=document.createElement('div'); d.className='bar';
+    d.innerHTML=`<span></span><span class="v">${pct(v)}</span><div class="track"><div class="fill" style="width:${Math.max(0,Math.min(1,v))*100}%"></div></div>`;
+    d.firstChild.textContent=name; el.appendChild(d); }
+}
+let lastPanel=0;
+function report(result, force){
+  const f=S.feature; S.lastResult=result;
+  setSummary(f.summary(result));
+  const now=performance.now(); if(!force && now-lastPanel<150) return; lastPanel=now; /* 右パネルは間引いて更新 */
+  renderBars(f.bars(result));
+  if (document.body.classList.contains('lab')){
+    const j = f.json ? f.json(result) : result;
+    let s=''; try{ s=JSON.stringify(j, (k,v)=> typeof v==='number' ? Math.round(v*1e4)/1e4 : v, 1); }catch(e){ s='（表示できません）'; }
+    $('json').textContent = s.length>2000 ? s.slice(0,2000)+'\n…（以下省略）' : s;
+  }
+}
+function metrics(ms){
+  const now=performance.now(); S.frames.push(now); while(S.frames.length && now-S.frames[0]>1000) S.frames.shift();
+  if (ms!=null){ S.timings.push(ms); if (S.timings.length>30) S.timings.shift(); }
+  $('mFps').textContent = S.frames.length;
+  $('mMs').textContent = S.timings.length ? (S.timings.reduce((a,b)=>a+b,0)/S.timings.length).toFixed(1) : '–';
+}
+
+/* ===== 設定パネル ===== */
+function buildCtrls(){
+  const f=S.feature, el=$('ctrls'); el.innerHTML='';
+  const add=(labelText, node, valText)=>{ const w=document.createElement('div'); w.className='ctrl'; const l=document.createElement('span'); l.textContent=labelText;
+    const v=document.createElement('span'); v.textContent=valText??''; w.append(l,v,node); el.appendChild(w); return v; };
+  if (f.models.length>1){ const s=document.createElement('select'); f.models.forEach((m,i)=>s.add(new Option(m.label,i)));
+    s.value=S.modelIdx[f.id]||0; s.onchange=()=>{ S.modelIdx[f.id]=+s.value; loadFeature(); }; add('モデル', s); }
+  if (!f.audio && !f.text){ const s=document.createElement('select'); s.add(new Option('GPU（速い）','GPU')); s.add(new Option('CPU','CPU'));
+    s.value=S.delegate; s.onchange=()=>{ S.delegate=s.value; loadFeature(); }; add('処理装置', s); }
+  for (const o of f.options){
+    if (o.choices){ const s=document.createElement('select'); o.choices.forEach(([v,t])=>s.add(new Option(t,v))); s.value=S.opts[o.key];
+      s.onchange=()=>{ S.opts[o.key]=s.value; if(S.input==='image') runImage(); }; add(o.label, s); continue; }
+    const r=document.createElement('input'); r.type='range'; r.min=o.min; r.max=o.max; r.step=o.step; r.value=S.opts[o.key];
+    const v=add(o.label, r, String(S.opts[o.key]));
+    r.oninput=()=>{ v.textContent=r.value; };
+    r.onchange=async()=>{ S.opts[o.key]=+r.value; if(!S.task) return; try{ await S.task.setOptions({[o.key]:+r.value}); }catch(e){ console.warn(e); }
+      if (S.input==='image') runImage(); };
+  }
+  if (!f.options.length && f.models.length<2 && (f.audio||f.text)) el.innerHTML='<div style="color:var(--sub);font-size:13px">この機能に設定項目はありません</div>';
+}
+
+/* ===== 機能の切り替えと読み込み ===== */
+function selectFeature(id){
+  const f=byId[id]; if(!f) return; S.feature=f;
+  document.querySelectorAll('#navList button').forEach(b=>b.classList.toggle('on', b.dataset.id===id)); $('navSelect').value=id;
+  $('fGroup').textContent=f.group; $('fName').textContent=f.name; $('fDesc').textContent=f.desc; $('fUse').textContent=f.use;
+  S.opts={}; f.options.forEach(o=>S.opts[o.key]=o.value);
+  document.querySelectorAll('#inputs button').forEach(b=>b.disabled=!f.inputs.includes(b.dataset.input));
+  $('inputHint').textContent = f.clickable ? '画像を開いて、切り抜きたい物をクリック' : '';
+  view.classList.toggle('clickable', !!f.clickable);
+  S.clickPoint=null; S.lastResult=null; renderBars([]); $('json').textContent='';
+  const input = f.inputs.includes(S.input) ? S.input : f.inputs[0];
+  loadFeature(input);
+}
+
+function stopCurrent(){
+  cancelAnimationFrame(S.raf); S.raf=0;
+  if (S.audioNode){ try{ S.audioNode.disconnect(); S.audioSrc?.disconnect(); }catch(e){} S.audioNode=null; S.audioSrc=null; }
+  clearTimeout($('textIn')._t);
+  if (S.task){ try{ S.task.close(); }catch(e){} S.task=null; }
+  S.timings=[]; S.frames=[]; $('mFps').textContent='–'; $('mMs').textContent='–'; $('mLoad').textContent='–';
+}
+
+async function loadFeature(input){
+  const my=++S.gen; const f=S.feature;
+  stopCurrent(); if (input) await setInput(input, my); if (my!==S.gen) return;
+  buildCtrls(); $('mNote').textContent='';
+  const mode = S.input==='image' ? 'IMAGE' : 'VIDEO';
+  const model = MODEL_BASE + f.models[S.modelIdx[f.id]||0].path;
+  const taskOpts = {}; f.options.forEach(o=>{ if(!o.local) taskOpts[o.key]=S.opts[o.key]; });
+  showLoading(`「${f.name}」のAIモデルを読み込んでいます…<br><small>初回は数秒〜数十秒かかります</small>`);
+  const t0=performance.now(); let task=null, usedCpu=false;
+  try {
+    try { task = await f.create(null, model, S.delegate, taskOpts, f.imageOnly?undefined:mode); }
+    catch(e){
+      if (S.delegate!=='GPU' || f.audio || f.text) throw e;
+      console.warn('GPUでの初期化に失敗したためCPUで再試行します', e);
+      if (my!==S.gen) return;
+      task = await f.create(null, model, 'CPU', taskOpts, f.imageOnly?undefined:mode); usedCpu=true;
+    }
+  } catch(e){
+    if (my!==S.gen) return; console.error(e);
+    showError(`AIモデルを読み込めませんでした。インターネットにつながっているか確認してください。<br><small>${escapeHtml(String(e.message||e)).slice(0,160)}</small>`, ()=>loadFeature());
+    return;
+  }
+  if (my!==S.gen){ try{ task.close(); }catch(e){} return; }
+  S.task=task; $('mLoad').textContent=((performance.now()-t0)/1000).toFixed(1);
+  if (usedCpu) $('mNote').textContent='この環境ではGPUが使えないため、CPUで実行しています。';
+  hideOverlay();
+  start();
+}
+
+function escapeHtml(s){ return s.replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ===== 入力の切り替え ===== */
+async function setInput(kind, my){
+  S.input=kind;
+  document.querySelectorAll('#inputs button').forEach(b=>b.classList.toggle('on', b.dataset.input===kind));
+  $('textbox').hidden = kind!=='text';
+  if (kind!=='camera' && S.stream){ S.stream.getTracks().forEach(t=>t.stop()); S.stream=null; vid.srcObject=null; }
+  if (kind!=='mic') stopMic();
+  if (kind!=='video' && !vid.srcObject){ vid.pause(); }
+  S.mirror = kind==='camera'; view.classList.toggle('mirror', S.mirror);
+  if (kind==='camera') await startCamera(my);
+  if (kind==='mic' || kind==='text'){ view.width=1280; view.height=720; ctx.fillStyle='#11151c'; ctx.fillRect(0,0,view.width,view.height); }
+}
+
+async function startCamera(my){
+  if (S.stream) return true;
+  if (!navigator.mediaDevices?.getUserMedia){ const msg='このブラウザではカメラを使えません。https のページで開いているか確認するか、「画像ファイル」を選んでください。';
+    showError(msg, null, ['画像ファイルを選ぶ', ()=>chooseInput('image')]); throw new CameraError(msg); }
+  let stream;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ width:{ideal:1280}, height:{ideal:720}, facingMode:'user' }, audio:false });
+  }catch(e){
+    S.stream=null;
+    const msg = e.name==='NotAllowedError' ? 'カメラの使用が許可されていません。アドレスバー左のアイコンからカメラを「許可」にするか、「画像ファイル」を選んでください。'
+      : e.name==='NotFoundError' ? 'カメラが見つかりません。カメラをつないでから「もう一度試す」を押すか、「画像ファイル」を選んでください。'
+      : e.name==='NotReadableError' ? 'カメラを他のアプリ（Teams・Zoom など）が使っている可能性があります。そちらを閉じてから「もう一度試す」を押してください。'
+      : 'カメラを起動できませんでした（'+e.name+'）。「画像ファイル」を選ぶこともできます。';
+    if (my===S.gen) showError(msg, ()=>loadFeature('camera'), ['画像ファイルを選ぶ', ()=>chooseInput('image')]);
+    throw new CameraError(msg);
+  }
+  /* 許可を待つ間に別の入力・機能へ切り替えられていたら、カメラをすぐ止める */
+  if (my!==S.gen || S.input!=='camera'){ stream.getTracks().forEach(t=>t.stop()); throw new CameraError('切り替え済み'); }
+  S.stream=stream; vid.srcObject=S.stream; vid.loop=false; await vid.play().catch(()=>{});
+  return true;
+}
+class CameraError extends Error{}
+
+function chooseInput(kind){
+  if (kind==='image'){ $('fileImage').value=''; $('fileImage').click(); return; }
+  if (kind==='video'){ $('fileVideo').value=''; $('fileVideo').click(); return; }
+  loadFeature(kind);
+}
+$('fileImage').onchange=e=>{ const file=e.target.files[0]; if(!file) return; const img=new Image();
+  img.onload=()=>{ S.img=img; S.clickPoint=null; loadFeature('image'); };
+  img.onerror=()=>showError('この画像を開けませんでした。JPEG か PNG の画像を選んでください。');
+  img.src=URL.createObjectURL(file); };
+$('fileVideo').onchange=e=>{ const file=e.target.files[0]; if(!file) return;
+  if (S.stream){ S.stream.getTracks().forEach(t=>t.stop()); S.stream=null; }
+  vid.srcObject=null; vid.src=URL.createObjectURL(file); vid.loop=true;
+  vid.onerror=()=>showError('この動画を再生できませんでした。MP4（H.264）形式の動画を選んでください。');
+  vid.play().catch(()=>{}); loadFeature('video'); };
+document.querySelectorAll('#inputs button').forEach(b=>b.onclick=()=>chooseInput(b.dataset.input));
+
+/* ===== 実行 ===== */
+function start(){
+  const f=S.feature;
+  if (f.text) return startText();
+  if (f.audio) return startMic();
+  if (S.input==='image'){
+    if (!S.img){ showPrompt('調べたい画像を選んでください。', '画像ファイルを選ぶ', ()=>chooseInput('image')); return; }
+    return runImage();
+  }
+  if (S.input==='video' && !vid.src){ showPrompt('調べたい動画を選んでください。', '動画ファイルを選ぶ', ()=>chooseInput('video')); return; }
+  S.lastVideoTime=-1; loop();
+}
+
+function fitCanvas(w,h){ if (view.width!==w || view.height!==h){ view.width=w; view.height=h; } }
+
+function loop(){
+  const f=S.feature, task=S.task; if(!task) return;
+  S.raf=requestAnimationFrame(loop);
+  if (vid.readyState<2 || !vid.videoWidth) return;
+  if (vid.currentTime===S.lastVideoTime) return;
+  S.lastVideoTime=vid.currentTime;
+  fitCanvas(vid.videoWidth, vid.videoHeight);
+  let r, ms;
+  try{ const t0=performance.now(); r=f.run(task, vid, performance.now(), 'VIDEO'); ms=performance.now()-t0; }
+  catch(e){ console.error(e); return; }
+  if (!f.drawsFrame) ctx.drawImage(vid,0,0,view.width,view.height);
+  f.draw(r, vid); metrics(ms); report(r);
+}
+
+function runImage(){
+  const f=S.feature, task=S.task, img=S.img; if(!task||!img) return;
+  fitCanvas(img.naturalWidth, img.naturalHeight);
+  let r, ms;
+  try{ const t0=performance.now(); r=f.run(task, img, 0, 'IMAGE'); ms=performance.now()-t0; }
+  catch(e){ console.error(e); showError('この画像の処理中にエラーが起きました。別の画像で試してください。'); return; }
+  if (!f.drawsFrame) ctx.drawImage(img,0,0,view.width,view.height);
+  f.draw(r, img); S.timings=[]; metrics(ms); $('mFps').textContent='–'; report(r, true);
+}
+
+view.addEventListener('click', e=>{
+  const f=S.feature; if(!f?.clickable || S.input!=='image' || !S.task) return;
+  const rc=view.getBoundingClientRect(); let x=(e.clientX-rc.left)/rc.width, y=(e.clientY-rc.top)/rc.height;
+  if (S.mirror) x=1-x;
+  S.clickPoint={x,y}; runImage();
+});
+
+/* ===== マイク ===== */
+async function startMic(){
+  const my=S.gen;
+  if (!navigator.mediaDevices?.getUserMedia){ showError('このブラウザではマイクを使えません。'); return; }
+  try{
+    if (!S.micStream){
+      const st = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+      if (my!==S.gen){ st.getTracks().forEach(t=>t.stop()); return; } /* 許可待ちの間に切り替えられた */
+      S.micStream = st;
+    }
+  }catch(e){
+    const msg = e.name==='NotAllowedError' ? 'マイクの使用が許可されていません。アドレスバー左のアイコンからマイクを「許可」にしてください。'
+      : e.name==='NotFoundError' ? 'マイクが見つかりません。マイクをつないでから「もう一度試す」を押してください。'
+      : 'マイクを起動できませんでした（'+e.name+'）。';
+    showError(msg, ()=>loadFeature('mic')); return;
+  }
+  if (my!==S.gen) return;
+  if (!S.audioCtx) S.audioCtx = new AudioContext();
+  if (S.audioCtx.state==='suspended') await S.audioCtx.resume().catch(()=>{});
+  const src = S.audioCtx.createMediaStreamSource(S.micStream);
+  const node = S.audioCtx.createScriptProcessor(8192, 1, 1);
+  const sr = S.audioCtx.sampleRate;
+  /* YAMNet は約1秒の音で判定するため、直近1秒分をためてから渡す */
+  const win = new Float32Array(sr); let filled = 0;
+  node.onaudioprocess = ev => {
+    if (my!==S.gen || !S.task) return;
+    const data = ev.inputBuffer.getChannelData(0);
+    win.copyWithin(0, data.length); win.set(data, win.length-data.length); filled=Math.min(win.length, filled+data.length);
+    if (filled < win.length){ drawLevel(data, []); return; }
+    let r, ms; try{ const t0=performance.now(); const res=S.task.classify(win.slice(), sr); ms=performance.now()-t0;
+      const last = res[res.length-1]; r = last?.classifications?.[0]?.categories || []; }catch(e){ console.error(e); return; }
+    drawLevel(data, r); metrics(ms); report(r);
+  };
+  src.connect(node); node.connect(S.audioCtx.destination);
+  S.audioNode=node; S.audioSrc=src;
+  report([], true);
+  if (S.audioCtx.state==='suspended') showPrompt('ブラウザの設定で音声の処理が止まっています。', '音の分類を始める', async()=>{ await S.audioCtx.resume(); hideOverlay(); });
+}
+function stopMic(){
+  if (S.audioNode){ try{ S.audioNode.disconnect(); S.audioSrc?.disconnect(); }catch(e){} S.audioNode=null; }
+  if (S.micStream){ S.micStream.getTracks().forEach(t=>t.stop()); S.micStream=null; }
+}
+function drawLevel(data, cats){
+  const W=view.width, H=view.height; ctx.fillStyle='#11151c'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#8ab4f8'; ctx.lineWidth=3; ctx.beginPath();
+  const step=Math.ceil(data.length/W);
+  for (let x=0;x<W;x++){ const v=data[x*step]||0; const y=H/2 - v*H*1.6; x?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
+  const top=cats[0]; if (top){ ctx.fillStyle='#fff'; ctx.font='bold 64px sans-serif'; ctx.textAlign='center'; ctx.fillText(ja(JA_SOUND,top.categoryName), W/2, H*0.28); ctx.textAlign='start'; }
+}
+
+/* ===== 文章 ===== */
+const SAMPLES = ['本日はご来場いただきありがとうございます。','Thank you for your inquiry.','감사합니다. 잘 부탁드립니다.','谢谢您的咨询。','Merci beaucoup pour votre aide.','Cảm ơn bạn rất nhiều.'];
+function startText(){
+  const ta=$('textIn'), box=$('samples'); box.innerHTML='';
+  SAMPLES.forEach(s=>{ const b=document.createElement('button'); b.type='button'; b.textContent=s.length>14?s.slice(0,14)+'…':s; b.onclick=()=>{ ta.value=s; detectText(); }; box.appendChild(b); });
+  ta.oninput=()=>{ clearTimeout(ta._t); ta._t=setTimeout(detectText, 250); };
+  ta.focus(); detectText();
+}
+function detectText(){
+  const t=$('textIn').value.trim(); if(!S.task || !S.feature?.text) return;
+  if (!t){ report(null, true); return; }
+  try{ const t0=performance.now(); const r=S.task.detect(t); metrics(performance.now()-t0); report(r, true); }catch(e){ console.error(e); }
+}
+
+/* ===== 表示モード ===== */
+function setMode(m){ document.body.classList.toggle('lab', m==='lab'); $('modeDemo').classList.toggle('on', m==='demo'); $('modeLab').classList.toggle('on', m==='lab');
+  try{ localStorage.setItem('mp-mode', m); }catch(e){} if (S.lastResult!=null && S.feature) report(S.lastResult, true); }
+$('modeDemo').onclick=()=>setMode('demo'); $('modeLab').onclick=()=>setMode('lab');
+
+/* 未処理のエラー（カメラ拒否など、既に案内を出したもの）は握りつぶす */
+window.addEventListener('unhandledrejection', e=>{ if (e.reason instanceof CameraError) e.preventDefault(); });
+
+/* ===== 起動 ===== */
+buildNav();
+let m='demo'; try{ m=localStorage.getItem('mp-mode')||'demo'; }catch(e){}
+setMode(m);
+selectFeature('hand');
+</script>
+</body>
+</html>
